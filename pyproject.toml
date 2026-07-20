@@ -1,2 +1,10 @@
+[project]
+name = "ley21719-checker"
+version = "0.1.0"
+dependencies = [
+    "requests==2.31.0",
+    "beautifulsoup4==4.12.2"
+]
+
 [tool.vercel]
 entrypoint = "api.analyze:handler"
