@@ -27,7 +27,6 @@ class handler(BaseHTTPRequestHandler):
 
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
                 'Accept-Language': 'es-CL,es;q=0.9,en;q=0.8'
             }
             
@@ -49,39 +48,35 @@ class handler(BaseHTTPRequestHandler):
                 })
                 return
 
+            # Buscamos en TODO el código fuente HTML en minúsculas y sin tildes
+            html_clean = response.text.lower().replace('á','a').replace('é','e').replace('í','i').replace('ó','o').replace('ú','u')
             soup = BeautifulSoup(response.text, 'html.parser')
             title = soup.title.string.strip() if soup.title else 'Sin título'
-            
-            # Buscamos en TODO el código fuente (HTML crudo) en minúsculas, es más fiable que get_text()
-            html_raw = response.text.lower()
-            
-            # Normalizamos quitando tildes del HTML crudo para máxima compatibilidad
-            html_clean = html_raw.replace('á','a').replace('é','e').replace('í','i').replace('ó','o').replace('ú','u')
 
             passed = []
             failed = []
             score = 0
 
-            # 1. Política de Privacidad (40 puntos)
-            if any(kw in html_clean for kw in ["politica de privacidad", "aviso de privacidad", "privacy policy", "privacidad"]):
-                passed.append("Aviso de Política de Privacidad detectado")
+            # 1. Política de Privacidad (40 puntos) - Ampliado a términos estándar de la industria
+            if any(kw in html_clean for kw in ["politica de privacidad", "aviso de privacidad", "privacy policy", "privacidad", "proteccion de datos", "terminos y condiciones", "terms of service"]):
+                passed.append("Aviso de Privacidad / Términos detectado")
                 score += 40
             else:
-                failed.append("No se detectó una Política de Privacidad visible")
+                failed.append("No se detectó Política de Privacidad o Términos de Servicio")
 
-            # 2. Cookies (30 puntos)
-            if any(kw in html_clean for kw in ["politica de cookies", "uso de cookies", "cookies", "cookie policy", "galletas"]):
-                passed.append("Mención de Cookies detectada")
+            # 2. Cookies (30 puntos) - Ampliado a consentimientos modernos
+            if any(kw in html_clean for kw in ["politica de cookies", "uso de cookies", "cookies", "cookie policy", "consentimiento", "consent", "gdpr", "cmg"]):
+                passed.append("Gestión o mención de Cookies detectada")
                 score += 30
             else:
-                failed.append("No se detectó aviso o mención de Cookies")
+                failed.append("No se detectó aviso de Cookies o consentimiento")
 
-            # 3. Datos Personales (30 puntos)
-            if any(kw in html_clean for kw in ["datos personales", "proteccion de datos", "personal data", "ley 21.719", "gdpr", "informacion personal"]):
+            # 3. Datos Personales (30 puntos) - Ampliado a variantes legales
+            if any(kw in html_clean for kw in ["datos personales", "informacion personal", "personal data", "ley 21.719", "gdpr", "tratamiento de datos", "recopilacion de datos"]):
                 passed.append("Mención de tratamiento de datos personales")
                 score += 30
             else:
-                failed.append("No se detectó mención a datos personales o protección de datos")
+                failed.append("No se detectó mención explícita a datos personales")
 
             self._send_json(200, {
                 "url": url, "score": score, "passed": passed, "failed": failed, "title": title
