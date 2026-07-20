@@ -33,22 +33,13 @@ class handler(BaseHTTPRequestHandler):
             response = requests.get(url, timeout=10, headers=headers, allow_redirects=True)
             
             if response.status_code in [403, 401, 429]:
-                self._send_json(200, {
-                    "url": url, "score": 0, "passed": [],
-                    "failed": ["El sitio bloqueó el análisis automático (protección anti-bot). Requiere revisión manual."],
-                    "title": "Acceso restringido"
-                })
+                self._send_json(200, {"url": url, "score": 0, "passed": [], "failed": [], "blocked": True, "title": "Acceso restringido"})
                 return
                 
             if response.status_code != 200:
-                self._send_json(200, {
-                    "url": url, "score": 0, "passed": [],
-                    "failed": ["El sitio no respondió correctamente (Código: " + str(response.status_code) + ")"],
-                    "title": "Sitio no accesible"
-                })
+                self._send_json(200, {"url": url, "score": 0, "passed": [], "failed": ["El sitio no respondió correctamente (Código: " + str(response.status_code) + ")"], "title": "Sitio no accesible"})
                 return
 
-            # Buscamos en TODO el código fuente HTML en minúsculas y sin tildes
             html_clean = response.text.lower().replace('á','a').replace('é','e').replace('í','i').replace('ó','o').replace('ú','u')
             soup = BeautifulSoup(response.text, 'html.parser')
             title = soup.title.string.strip() if soup.title else 'Sin título'
@@ -57,31 +48,29 @@ class handler(BaseHTTPRequestHandler):
             failed = []
             score = 0
 
-            # 1. Política de Privacidad (40 puntos) - Ampliado a términos estándar de la industria
             if any(kw in html_clean for kw in ["politica de privacidad", "aviso de privacidad", "privacy policy", "privacidad", "proteccion de datos", "terminos y condiciones", "terms of service"]):
                 passed.append("Aviso de Privacidad / Términos detectado")
                 score += 40
             else:
                 failed.append("No se detectó Política de Privacidad o Términos de Servicio")
 
-            # 2. Cookies (30 puntos) - Ampliado a consentimientos modernos
             if any(kw in html_clean for kw in ["politica de cookies", "uso de cookies", "cookies", "cookie policy", "consentimiento", "consent", "gdpr", "cmg"]):
                 passed.append("Gestión o mención de Cookies detectada")
                 score += 30
             else:
                 failed.append("No se detectó aviso de Cookies o consentimiento")
 
-            # 3. Datos Personales (30 puntos) - Ampliado a variantes legales
             if any(kw in html_clean for kw in ["datos personales", "informacion personal", "personal data", "ley 21.719", "gdpr", "tratamiento de datos", "recopilacion de datos"]):
                 passed.append("Mención de tratamiento de datos personales")
                 score += 30
             else:
                 failed.append("No se detectó mención explícita a datos personales")
 
-            self._send_json(200, {
-                "url": url, "score": score, "passed": passed, "failed": failed, "title": title
-            })
+            self._send_json(200, {"url": url, "score": score, "passed": passed, "failed": failed, "title": title})
 
+        except requests.exceptions.ConnectionError:
+            # Captura el "Connection refused" de Emol y otros WAFs
+            self._send_json(200, {"url": url, "score": 0, "passed": [], "failed": [], "blocked": True, "title": "Sitio protegido por Firewall"})
         except requests.exceptions.Timeout:
             self._send_json(200, {"url": url, "score": 0, "passed": [], "failed": ["El sitio tardó demasiado en responder (Timeout)."], "title": "Timeout"})
         except Exception as e:
