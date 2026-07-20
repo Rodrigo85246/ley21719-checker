@@ -29,17 +29,55 @@ class handler(BaseHTTPRequestHandler):
             if not url.startswith('http'):
                 url = 'https://' + url
 
-            response = requests.get(url, timeout=10)
-            soup = BeautifulSoup(response.text, 'html.parser')
-            title = soup.title.string.strip() if soup.title else 'Sin título'
+            # User-Agent para evitar bloqueos básicos de sitios
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+            response = requests.get(url, timeout=10, headers=headers)
+            
+            if response.status_code != 200:
+                results = {
+                    "url": url,
+                    "score": 0,
+                    "passed": [],
+                    "failed": ["El sitio no respondió correctamente (Código: " + str(response.status_code) + ")"],
+                    "title": "Sitio no accesible"
+                }
+            else:
+                soup = BeautifulSoup(response.text, 'html.parser')
+                text_content = soup.get_text().lower()
+                title = soup.title.string.strip() if soup.title else 'Sin título'
 
-            results = {
-                "url": url,
-                "score": 100 if response.status_code == 200 else 50,
-                "passed": ["Conexión exitosa"] if response.status_code == 200 else [],
-                "failed": ["Error de conexión"] if response.status_code != 200 else [],
-                "title": title
-            }
+                passed = []
+                failed = []
+                score = 0
+
+                # 1. Política de Privacidad (40 puntos)
+                if "política de privacidad" in text_content or "politica de privacidad" in text_content:
+                    passed.append("Aviso de Política de Privacidad detectado")
+                    score += 40
+                else:
+                    failed.append("No se detectó una Política de Privacidad visible")
+
+                # 2. Cookies (30 puntos)
+                if "cookie" in text_content:
+                    passed.append("Mención de Cookies detectada")
+                    score += 30
+                else:
+                    failed.append("No se detectó aviso o mención de Cookies")
+
+                # 3. Datos Personales (30 puntos)
+                if "datos personales" in text_content:
+                    passed.append("Mención de tratamiento de datos personales")
+                    score += 30
+                else:
+                    failed.append("No se detectó mención a datos personales")
+
+                results = {
+                    "url": url,
+                    "score": score,
+                    "passed": passed,
+                    "failed": failed,
+                    "title": title
+                }
 
             self.send_response(200)
             self.send_header('Access-Control-Allow-Origin', '*')
