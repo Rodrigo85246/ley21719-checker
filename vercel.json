@@ -1,4 +1,9 @@
 {
+  "functions": {
+    "api/analyze.py": {
+      "runtime": "vercel-python@latest"
+    }
+  },
   "headers": [
     {
       "source": "/api/(.*)",
